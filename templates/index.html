@@ -1,22 +1,109 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Smart Home AI</title>
-    <link rel="stylesheet" href="html.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Optional custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='html.css') }}">
+    
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .header-title {
+            text-align: center;
+            font-weight: 700;
+            margin-bottom: 30px;
+            color: #2c3e50;
+        }
+        .graph-card {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            padding: 20px;
+            background-color: white;
+        }
+        .suggestion-card {
+            background: linear-gradient(135deg, #6bc1ff, #00aaff);
+            color: white;
+            font-weight: 500;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .form-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+    </style>
 </head>
-<body class="p-4">
-    <div class="container">
-        <h1 class="mb-4">Smart Home Energy Manager</h1>
-        
-        <div class="card p-3 mb-4">
-            <h3>Temperature Simulation</h3>
-            {{ graph | safe }}
+<body>
+    <div class="container py-4">
+
+        <h1 class="header-title">Smart Home Energy Manager</h1>
+
+        <!-- Simulation options form -->
+        <div class="form-card">
+            <form method="GET">
+                <div class="row g-3 align-items-center">
+                    <div class="col-auto">
+                        <label for="weather" class="col-form-label">Weather:</label>
+                    </div>
+                    <div class="col-auto">
+                        <select id="weather" name="weather" class="form-select">
+                            <option value="sunny" {% if weather=='sunny' %}selected{% endif %}>Sunny</option>
+                            <option value="cloudy" {% if weather=='cloudy' %}selected{% endif %}>Cloudy</option>
+                            <option value="rainy" {% if weather=='rainy' %}selected{% endif %}>Rainy</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <label for="day_temp" class="col-form-label">Max Temp (°C):</label>
+                    </div>
+                    <div class="col-auto">
+                        <input type="number" id="day_temp" name="day_temp" value="{{ day_temp }}" class="form-control" min=-10 max=40>
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary">Simulate</button>
+                    </div>
+                </div>
+            </form>
         </div>
 
-        <div class="alert alert-info">
-            <strong>AI Suggestion:</strong> {{ suggestion }}
+        <!-- Graphs -->
+        <div class="card graph-card mb-4">
+            <h4>Temperature Simulation</h4>
+            {{ graph_temp | safe }}
         </div>
+
+        <div class="card graph-card mb-4">
+            <h4>Load vs PV Output</h4>
+            {{ graph_load | safe }}
+        </div>
+
+        <div class="card graph-card mb-4">
+            <h4>Battery SOC</h4>
+            {{ graph_battery | safe }}
+        </div>
+
+        <!-- AI Suggestion -->
+        <div class="suggestion-card mb-4">
+            <h5 class="mb-2">AI Suggestion</h5>
+            <p>{{ suggestion }}</p>
+        </div>
+
+        <!-- Footer -->
+        <footer class="text-center text-muted small">
+            Prototype IB Project | Powered by Flask & Plotly
+        </footer>
     </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
