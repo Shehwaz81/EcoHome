@@ -4,4 +4,4 @@ app = Flask(__name__)
 
 @app.route("/")
 def main(): 
-    return "<p>IDFK BRO world</p>"
+    return render_template("index.html")
