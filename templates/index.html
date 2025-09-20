@@ -2,108 +2,383 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Smart Home AI</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <!-- Optional custom CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='html.css') }}">
-    
-    <style>
-        body {
-            background-color: #f8f9fa;
-        }
-        .header-title {
-            text-align: center;
-            font-weight: 700;
-            margin-bottom: 30px;
-            color: #2c3e50;
-        }
-        .graph-card {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            border-radius: 12px;
-            padding: 20px;
-            background-color: white;
-        }
-        .suggestion-card {
-            background: linear-gradient(135deg, #6bc1ff, #00aaff);
-            color: white;
-            font-weight: 500;
-            border-radius: 12px;
-            padding: 20px;
-        }
-        .form-card {
-            background-color: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home AI - Energy Management</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
 </head>
 <body>
-    <div class="container py-4">
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <i class="fas fa-home"></i>
+                SmartHome AI
+            </div>
+            <ul class="nav-links">
+                <li><a href="/" class="active">Dashboard</a></li>
+                <li><a href="/analytics">Analytics</a></li>
+                <li><a href="/optimization">Optimization</a></li>
+                <li><a href="/settings">Settings</a></li>
+            </ul>
+            <button class="mobile-menu">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </nav>
 
-        <h1 class="header-title">Smart Home Energy Manager</h1>
+    <div class="container">
+        <!-- Hero Section -->
+        <div class="hero-section">
+            <h1 class="hero-title">Smart Energy Management</h1>
+            <p class="hero-subtitle">Optimize your home's energy consumption with AI-powered insights</p>
+        </div>
 
-        <!-- Simulation options form -->
-        <div class="form-card">
-            <form method="GET">
-                <div class="row g-3 align-items-center">
-                    <div class="col-auto">
-                        <label for="weather" class="col-form-label">Weather:</label>
-                    </div>
-                    <div class="col-auto">
-                        <select id="weather" name="weather" class="form-select">
-                            <option value="sunny" {% if weather=='sunny' %}selected{% endif %}>Sunny</option>
-                            <option value="cloudy" {% if weather=='cloudy' %}selected{% endif %}>Cloudy</option>
-                            <option value="rainy" {% if weather=='rainy' %}selected{% endif %}>Rainy</option>
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <h2 class="panel-title">
+                <i class="fas fa-sliders-h"></i>
+                Simulation Controls
+            </h2>
+            <form method="GET" id="simulationForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="weather" class="form-label">Weather Condition</label>
+                        <select id="weather" name="weather" class="form-input">
+                            <option value="sunny" {% if weather=='sunny' %}selected{% endif %}>☀️ Sunny</option>
+                            <option value="cloudy" {% if weather=='cloudy' %}selected{% endif %}>☁️ Cloudy</option>
+                            <option value="rainy" {% if weather=='rainy' %}selected{% endif %}>🌧️ Rainy</option>
                         </select>
                     </div>
-                    <div class="col-auto">
-                        <label for="day_temp" class="col-form-label">Max Temp (°C):</label>
+                    <div class="form-group">
+                        <label for="day_temp" class="form-label">Max Temperature (°C)</label>
+                        <input type="number" id="day_temp" name="day_temp" value="{{ day_temp or 25 }}" 
+                               class="form-input" min="-10" max="40" step="1">
                     </div>
-                    <div class="col-auto">
-                        <input type="number" id="day_temp" name="day_temp" value="{{ day_temp }}" class="form-control" min=-10 max=40>
+                    <div class="form-group">
+                        <label for="house_size" class="form-label">House Size (m²)</label>
+                        <input type="number" id="house_size" name="house_size" value="{{ house_size or 120 }}" 
+                               class="form-input" min="50" max="120" step="10">
                     </div>
-                    <div class="col-auto">
-                        <button type="submit" class="btn btn-primary">Simulate</button>
+                    <div class="form-group">
+                        <button type="submit" class="btn-primary" id="simulateBtn">
+                            <i class="fas fa-play"></i> Run Simulation
+                        </button>
                     </div>
                 </div>
             </form>
         </div>
 
-        <!-- Graphs -->
-        <div class="card graph-card mb-4">
-            <h4>Temperature Simulation</h4>
-            {{ graph_temp | safe }}
+        <!-- Key Metrics -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <i class="fas fa-bolt metric-icon"></i>
+                <span class="metric-value">{{ energy_per_sqm or '32.4' }}</span>
+                <div class="metric-label">kWh/m²·year</div>
+                <div class="status-indicator {% if (energy_per_sqm or 32.4) <= 35 %}status-optimal{% else %}status-warning{% endif %}">
+                    <i class="fas fa-{% if (energy_per_sqm or 32.4) <= 35 %}check-circle{% else %}exclamation-triangle{% endif %}"></i>
+                    {% if (energy_per_sqm or 32.4) <= 35 %}Under Target{% else %}Over Target{% endif %}
+                </div>
+            </div>
+            <div class="metric-card">
+                <i class="fas fa-solar-panel metric-icon"></i>
+                <span class="metric-value">{{ solar_efficiency or '87' }}%</span>
+                <div class="metric-label">Solar Efficiency</div>
+            </div>
+            <div class="metric-card">
+                <i class="fas fa-battery-three-quarters metric-icon"></i>
+                <span class="metric-value">{{ battery_utilization or '73' }}%</span>
+                <div class="metric-label">Battery Utilization</div>
+            </div>
+            <div class="metric-card">
+                <i class="fas fa-dollar-sign metric-icon"></i>
+                <span class="metric-value">${{ cost_savings or '1,240' }}</span>
+                <div class="metric-label">Annual Savings</div>
+            </div>
         </div>
 
-        <div class="card graph-card mb-4">
-            <h4>Load vs PV Output</h4>
-            {{ graph_load | safe }}
+        <!-- Charts -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3 class="chart-title">
+                    <i class="fas fa-thermometer-half"></i>
+                    Temperature Analysis
+                </h3>
+                <div class="chart-content">
+                    <canvas id="temperatureChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3 class="chart-title">
+                    <i class="fas fa-chart-bar"></i>
+                    Energy Flow
+                </h3>
+                <div class="chart-content">
+                    <canvas id="energyChart"></canvas>
+                </div>
+            </div>
         </div>
 
-        <div class="card graph-card mb-4">
-            <h4>Battery SOC</h4>
-            {{ graph_battery | safe }}
+        <div class="chart-card">
+            <h3 class="chart-title">
+                <i class="fas fa-battery-half"></i>
+                Battery State of Charge
+            </h3>
+            <div class="chart-content">
+                <canvas id="batteryChart"></canvas>
+            </div>
         </div>
 
-        <!-- AI Suggestion -->
-        <div class="suggestion-card mb-4">
-            <h5 class="mb-2">AI Suggestion</h5>
-            <p>{{ suggestion }}</p>
+        <!-- AI Insights -->
+        <div class="ai-insight">
+            <h3 class="ai-title">
+                <i class="fas fa-brain"></i>
+                AI Optimization Insight
+            </h3>
+            <p class="ai-text">
+                {{ suggestion or "Based on current weather conditions and energy patterns, consider shifting high-energy appliances to peak solar hours (11 AM - 2 PM) to maximize renewable energy utilization and reduce grid dependency by up to 23%." }}
+            </p>
         </div>
 
         <!-- Footer -->
-        <footer class="text-center text-muted small">
-            Prototype IB Project | Powered by Flask & Plotly
+        <footer class="footer">
+            <p>🎓 IB Computer Science Project | Powered by Flask, Chart.js & AI | {{ current_year or '2024' }}</p>
         </footer>
     </div>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Load Chart.js before our custom JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    
+    <!-- Pass data from Flask to JavaScript -->
+    <script id="chart-data" type="application/json">{{ chart_data | safe }}</script>
+    
+    <script>
+        // Get chart data safely from the JSON script tag
+        let chartData;
+        try {
+            const dataElement = document.getElementById('chart-data');
+            chartData = JSON.parse(dataElement.textContent);
+        } catch (e) {
+            console.error('Error parsing chart data:', e);
+            // Fallback data if parsing fails
+            chartData = {
+                hours: ['0:00', '1:00', '2:00', '3:00', '4:00', '5:00', '6:00', '7:00', '8:00', '9:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'],
+                temperature: { indoor: Array(24).fill(20), outdoor: Array(24).fill(15) },
+                energy: { load: Array(24).fill(2), pv_output: Array(24).fill(1) },
+                battery: Array(24).fill(5)
+            };
+        }
+
+        // Chart.js styling configuration
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: {
+                duration: 1000,
+                easing: 'easeInOutQuart'
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        font: { size: 12, weight: '500' },
+                        padding: 20
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { 
+                        color: 'rgba(0,0,0,0.05)',
+                        drawBorder: false
+                    },
+                    ticks: { 
+                        font: { size: 11 },
+                        color: '#666'
+                    }
+                },
+                y: {
+                    grid: { 
+                        color: 'rgba(0,0,0,0.05)',
+                        drawBorder: false
+                    },
+                    ticks: { 
+                        font: { size: 11 },
+                        color: '#666'
+                    }
+                }
+            }
+        };
+
+        // Wait for DOM to be ready
+        document.addEventListener('DOMContentLoaded', function() {
+            // Temperature Chart
+            const tempCtx = document.getElementById('temperatureChart');
+            if (tempCtx) {
+                new Chart(tempCtx.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: chartData.hours,
+                        datasets: [
+                            {
+                                label: 'Indoor Temperature',
+                                data: chartData.temperature.indoor,
+                                borderColor: '#667eea',
+                                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.4,
+                                pointBackgroundColor: '#667eea',
+                                pointBorderColor: '#fff',
+                                pointBorderWidth: 2,
+                                pointRadius: 4,
+                                pointHoverRadius: 6
+                            },
+                            {
+                                label: 'Outdoor Temperature',
+                                data: chartData.temperature.outdoor,
+                                borderColor: '#764ba2',
+                                backgroundColor: 'rgba(118, 75, 162, 0.1)',
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.4,
+                                pointBackgroundColor: '#764ba2',
+                                pointBorderColor: '#fff',
+                                pointBorderWidth: 2,
+                                pointRadius: 4,
+                                pointHoverRadius: 6
+                            }
+                        ]
+                    },
+                    options: {
+                        ...chartOptions,
+                        scales: {
+                            ...chartOptions.scales,
+                            y: {
+                                ...chartOptions.scales.y,
+                                title: { 
+                                    display: true, 
+                                    text: 'Temperature (°C)',
+                                    font: { weight: 'bold' }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Energy Chart
+            const energyCtx = document.getElementById('energyChart');
+            if (energyCtx) {
+                new Chart(energyCtx.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: chartData.hours,
+                        datasets: [
+                            {
+                                label: 'Energy Load',
+                                data: chartData.energy.load,
+                                backgroundColor: 'rgba(231, 76, 60, 0.8)',
+                                borderColor: '#e74c3c',
+                                borderWidth: 2,
+                                borderRadius: 6,
+                                borderSkipped: false
+                            },
+                            {
+                                label: 'Solar Output',
+                                data: chartData.energy.pv_output,
+                                backgroundColor: 'rgba(46, 204, 113, 0.8)',
+                                borderColor: '#2ecc71',
+                                borderWidth: 2,
+                                borderRadius: 6,
+                                borderSkipped: false
+                            }
+                        ]
+                    },
+                    options: {
+                        ...chartOptions,
+                        scales: {
+                            ...chartOptions.scales,
+                            y: {
+                                ...chartOptions.scales.y,
+                                title: { 
+                                    display: true, 
+                                    text: 'Energy (kWh)',
+                                    font: { weight: 'bold' }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Battery Chart
+            const batteryCtx = document.getElementById('batteryChart');
+            if (batteryCtx) {
+                new Chart(batteryCtx.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: chartData.hours,
+                        datasets: [{
+                            label: 'Battery Charge',
+                            data: chartData.battery,
+                            borderColor: '#f39c12',
+                            backgroundColor: 'rgba(243, 156, 18, 0.2)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#f39c12',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        }]
+                    },
+                    options: {
+                        ...chartOptions,
+                        scales: {
+                            ...chartOptions.scales,
+                            y: {
+                                ...chartOptions.scales.y,
+                                title: { 
+                                    display: true, 
+                                    text: 'Charge (kWh)',
+                                    font: { weight: 'bold' }
+                                },
+                                min: 0,
+                                max: 10
+                            }
+                        }
+                    }
+                });
+            }
+        });
+
+        // Form handling
+        document.addEventListener('DOMContentLoaded', function() {
+            const simulationForm = document.getElementById('simulationForm');
+            const simulateBtn = document.getElementById('simulateBtn');
+            
+            if (simulationForm && simulateBtn) {
+                simulationForm.addEventListener('submit', function() {
+                    simulateBtn.innerHTML = '<span class="loading-spinner"></span> Simulating...';
+                    simulateBtn.disabled = true;
+                });
+
+                // Auto-update on input change
+                let timeout;
+                const inputs = document.querySelectorAll('.form-input');
+                inputs.forEach(input => {
+                    input.addEventListener('change', function() {
+                        clearTimeout(timeout);
+                        timeout = setTimeout(() => {
+                            simulationForm.submit();
+                        }, 800);
+                    });
+                });
+            }
+        });
+    </script>
 </body>
 </html>

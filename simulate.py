@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-# Hours of the day
+# creates an array from 0 -> 23 (0 based)
 hours = np.arange(0, 24)
 
 # Outdoor temperature (°C): sine wave (cold night, warm day)
