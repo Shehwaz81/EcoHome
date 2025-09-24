@@ -28,7 +28,6 @@
     </nav>
 
     <div class="container">
-        <!-- Hero Section -->
         <div class="hero-section">
             <h1 class="hero-title">Smart Energy Management</h1>
             <p class="hero-subtitle">Optimize your home's energy consumption with AI-powered insights</p>
@@ -77,7 +76,7 @@
                 <div class="metric-label">kWh/m²·year</div>
                 <div class="status-indicator {% if (energy_per_sqm or 32.4) <= 35 %}status-optimal{% else %}status-warning{% endif %}">
                     <i class="fas fa-{% if (energy_per_sqm or 32.4) <= 35 %}check-circle{% else %}exclamation-triangle{% endif %}"></i>
-                    {% if (energy_per_sqm or 32.4) <= 35 %}Under Target{% else %}Over Target{% endif %}
+                    {% if (energy_per_sqm) <= 300 %}Under Target{% else %}Over Target{% endif %}
                 </div>
             </div>
             <div class="metric-card">
@@ -97,7 +96,6 @@
             </div>
         </div>
 
-        <!-- Charts -->
         <div class="charts-grid">
             <div class="chart-card">
                 <h3 class="chart-title">
@@ -129,7 +127,6 @@
             </div>
         </div>
 
-        <!-- AI Insights -->
         <div class="ai-insight">
             <h3 class="ai-title">
                 <i class="fas fa-brain"></i>
@@ -140,7 +137,6 @@
             </p>
         </div>
 
-        <!-- Footer -->
         <footer class="footer">
             <p>🎓 IB Computer Science Project | Powered by Flask, Chart.js & AI | {{ current_year or '2024' }}</p>
         </footer>
@@ -154,7 +150,7 @@
     
     <script>
         // Get chart data safely from the JSON script tag
-        let chartData;
+        let chartData;  
         try {
             const dataElement = document.getElementById('chart-data');
             chartData = JSON.parse(dataElement.textContent);

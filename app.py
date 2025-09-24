@@ -27,7 +27,7 @@ def index():
     battery_soc = np.cumsum(pv_output - load)
     battery_soc = np.clip(battery_soc, 0, 10)
     
-    # Calculate metrics for CGSP
+    # Calculate metrics for CGSP    
     daily_consumption = np.sum(load)
     annual_consumption = daily_consumption * 365
     energy_per_sqm = annual_consumption / house_size
