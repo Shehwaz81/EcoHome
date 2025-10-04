@@ -1,69 +1,107 @@
 from flask import Flask, render_template, request
-import pandas as pd
 import numpy as np
 import json
 
 app = Flask(__name__)
 
+# --- Constants ---
+HOUSE_SIZE_DEFAULT = 120  # m²
+PV_PANELS = 13
+PV_PANEL_W = 330  # W
+PV_SYSTEM_KW = PV_PANELS * PV_PANEL_W / 1000  # 4.29 kW system
+DAILY_PV_KWH_BASE = 17.16  # average daily PV energy (adjusted by weather/season)
+HOUSE_CONSUMPTION_KWH_DAY = 11  # max daily to meet IB constraints
+BATTERY_CAPACITY_KWH = 10
+COST_PER_M = 43784
+EMBODIED_CARBON = 180  # kg CO₂e/m²
+WATER_SAVING = 30  # %
+
+# Seasonal solar factor (Shirakawa)
+MONTH_FACTORS = {
+    'Jan':0.6, 'Feb':0.7, 'Mar':0.8, 'Apr':0.9, 'May':1.0,
+    'Jun':1.0, 'Jul':1.0, 'Aug':0.95, 'Sep':0.85, 'Oct':0.75, 'Nov':0.65, 'Dec':0.6
+}
+
 @app.route("/")
 def index():
     weather = request.args.get("weather", "sunny")
-    day_temp = float(request.args.get("day_temp", 25))
-    house_size = float(request.args.get("house_size", 120))
-    
-    # Generate simulation data
-    hours = np.arange(0, 24)
-    outdoor_temp = day_temp * np.sin((hours - 6) * np.pi / 12)
-    indoor_temp = 20 + np.random.normal(0, 0.5, size=24)
-    load = np.abs(outdoor_temp - 20) * 0.2
-    
-    if weather == "sunny":
-        pv_output = np.maximum(0, 5 * np.sin((hours - 6) * np.pi / 12) * 1.2)
-    elif weather == "cloudy":
-        pv_output = np.maximum(0, 5 * np.sin((hours - 6) * np.pi / 12) * 0.7)
+    month = request.args.get("month", "Jan")
+    house_size = float(request.args.get("house_size", HOUSE_SIZE_DEFAULT))
+
+    # Adjust PV for weather & month
+    weather_factor = {"sunny":1.0, "cloudy":0.7, "rainy":0.4}
+    pv_daily = DAILY_PV_KWH_BASE * weather_factor.get(weather,1.0) * MONTH_FACTORS.get(month,1.0)
+
+    # hourly load prof
+    hours = np.arange(24)
+    base_load = np.full(24, HOUSE_CONSUMPTION_KWH_DAY/24)
+    peak_profile = np.array([0.2,0.3,0.5,0.6,0.8,1,1,0.9,0.7,0.6,0.5,0.4,
+                             0.4,0.5,0.6,0.8,1,1,0.8,0.6,0.4,0.3,0.2,0.2])
+    peak_profile = peak_profile - np.mean(peak_profile)  # center around 0
+    # Scale peak_profile to fit daily energy limit
+    peak_scale = 1.0
+    while np.sum(base_load + peak_profile*peak_scale) > HOUSE_CONSUMPTION_KWH_DAY:
+        peak_scale *= 0.95
+    load_hourly = base_load + peak_profile*peak_scale
+
+    # --- PV hourly profile ---
+    pv_hourly = pv_daily * np.sin((hours - 6) * np.pi / 12)
+    pv_hourly = np.clip(pv_hourly, 0, None)
+
+    # --- Battery simulation ---
+    EFFICIENCY = 0.9
+    MIN_SOC = 1  # kWh
+    soc = 0
+    battery_soc = np.zeros(24)
+    for i in range(24):
+        net = pv_hourly[i] - load_hourly[i]
+        if net > 0:
+            soc += net * EFFICIENCY
+        else:
+            soc += net / EFFICIENCY
+        soc = min(max(soc, MIN_SOC), BATTERY_CAPACITY_KWH)
+        battery_soc[i] = soc
+
+    # --- Metrics ---
+    daily_consumption = np.sum(load_hourly)
+    energy_per_sqm = daily_consumption*365/house_size
+    solar_coverage = min((np.sum(pv_hourly)/daily_consumption)*100, 100)  # capped at 100%
+    battery_utilization = (np.sum(battery_soc > MIN_SOC)/24)*100
+    total_cost = int(COST_PER_M * house_size)
+
+    # --- Dynamic AI suggestions ---
+    if battery_utilization < 50:
+        suggestion = "Battery underused. Store excess PV or shift appliance usage to daytime."
+    elif battery_utilization > 90:
+        suggestion = "Battery often full. Shift appliances to peak solar hours (11-14h)."
     else:
-        pv_output = np.maximum(0, 5 * np.sin((hours - 6) * np.pi / 12) * 0.4)
-    
-    battery_soc = np.cumsum(pv_output - load)
-    battery_soc = np.clip(battery_soc, 0, 10)
-    
-    # Calculate metrics for CGSP    
-    daily_consumption = np.sum(load)
-    annual_consumption = daily_consumption * 365
-    energy_per_sqm = annual_consumption / house_size
-    solar_efficiency = (np.sum(pv_output) / (5 * 12)) * 100  # Max possible vs actual
-    battery_utilization = (np.sum(battery_soc > 0) / 24) * 100
-    cost_savings = annual_consumption * 0.15  # Assume $0.15/kWh saved
-    
-    # Prepare data for Chart.js (convert numpy arrays to Python lists)
+        suggestion = "Shift high-energy appliances to peak solar hours (11-14h)."
+
+    # --- Chart data ---
     chart_data = {
-        'hours': [f"{h}:00" for h in hours],
-        'temperature': {
-            'indoor': [round(temp, 1) for temp in indoor_temp],
-            'outdoor': [round(temp, 1) for temp in outdoor_temp]
-        },
-        'energy': {
-            'load': [round(load_val, 2) for load_val in load],
-            'pv_output': [round(pv_val, 2) for pv_val in pv_output]
-        },
-        'battery': [round(soc, 2) for soc in battery_soc]
+        'months': list(MONTH_FACTORS.keys()),
+        'consumption':[HOUSE_CONSUMPTION_KWH_DAY*30]*12,
+        'pv_output':[pv_daily*30]*12,
+        'hourly_profiles':{
+            'Jan': {'hours':[f"{h}:00" for h in hours], 'load':load_hourly.tolist(), 'pv_output':pv_hourly.tolist()},
+            'Jul': {'hours':[f"{h}:00" for h in hours], 'load':load_hourly.tolist(), 'pv_output':pv_hourly.tolist()}
+        }
     }
-    
-    suggestion = f"Optimize energy usage during peak solar hours (11 AM - 2 PM). Current solar efficiency: {solar_efficiency:.1f}%"
-    
+
     return render_template(
         "index.html",
         chart_data=json.dumps(chart_data),
         suggestion=suggestion,
         weather=weather,
-        day_temp=int(day_temp),
+        month=month,
         house_size=int(house_size),
-        energy_per_sqm=round(energy_per_sqm, 1),
-        solar_efficiency=round(solar_efficiency),
+        energy_per_sqm=round(energy_per_sqm,1),
+        solar_coverage=round(solar_coverage,1),
         battery_utilization=round(battery_utilization),
-        cost_savings=round(cost_savings),
-        current_year=2024
+        total_cost=total_cost,
+        embodied_carbon=EMBODIED_CARBON,
+        water_saving=WATER_SAVING
     )
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+if __name__ == "__main__":
+    app.run(debug=True)

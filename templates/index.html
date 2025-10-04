@@ -1,380 +1,123 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Home AI - Energy Management</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
-</head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar">
-        <div class="nav-container">
-            <div class="logo">
-                <i class="fas fa-home"></i>
-                SmartHome AI
-            </div>
-            <ul class="nav-links">
-                <li><a href="/" class="active">Dashboard</a></li>
-                <li><a href="/analytics">Analytics</a></li>
-                <li><a href="/optimization">Optimization</a></li>
-                <li><a href="/settings">Settings</a></li>
-            </ul>
-            <button class="mobile-menu">
-                <i class="fas fa-bars"></i>
-            </button>
-        </div>
-    </nav>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Smart Home AI - Shirakawa Simulation</title>
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="/static/index.css">
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>Smart Home Energy Dashboard</h1>
+                <p>Shirakawa, Japan – Heating-Dominated Simulation</p>
+            </header>
 
-    <div class="container">
-        <div class="hero-section">
-            <h1 class="hero-title">Smart Energy Management</h1>
-            <p class="hero-subtitle">Optimize your home's energy consumption with AI-powered insights</p>
-        </div>
-
-        <!-- Control Panel -->
-        <div class="control-panel">
-            <h2 class="panel-title">
-                <i class="fas fa-sliders-h"></i>
-                Simulation Controls
-            </h2>
-            <form method="GET" id="simulationForm">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="weather" class="form-label">Weather Condition</label>
-                        <select id="weather" name="weather" class="form-input">
-                            <option value="sunny" {% if weather=='sunny' %}selected{% endif %}>☀️ Sunny</option>
-                            <option value="cloudy" {% if weather=='cloudy' %}selected{% endif %}>☁️ Cloudy</option>
-                            <option value="rainy" {% if weather=='rainy' %}selected{% endif %}>🌧️ Rainy</option>
+            <!-- Controls -->
+            <div class="controls">
+                <form method="GET" id="simulationForm" style="display:flex;flex-wrap:wrap;gap:15px;justify-content:center;">
+                    <label>Weather
+                        <select name="weather">
+                            <option value="sunny" {% if weather=='sunny' %}selected{% endif %}>Sunny</option>
+                            <option value="cloudy" {% if weather=='cloudy' %}selected{% endif %}>Cloudy</option>
+                            <option value="rainy" {% if weather=='rainy' %}selected{% endif %}>Rainy</option>
                         </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="day_temp" class="form-label">Max Temperature (°C)</label>
-                        <input type="number" id="day_temp" name="day_temp" value="{{ day_temp or 25 }}" 
-                               class="form-input" min="-10" max="40" step="1">
-                    </div>
-                    <div class="form-group">
-                        <label for="house_size" class="form-label">House Size (m²)</label>
-                        <input type="number" id="house_size" name="house_size" value="{{ house_size or 120 }}" 
-                               class="form-input" min="50" max="120" step="10">
-                    </div>
-                    <div class="form-group">
-                        <button type="submit" class="btn-primary" id="simulateBtn">
-                            <i class="fas fa-play"></i> Run Simulation
-                        </button>
+                    </label>
+                    <label>House Size (m²)
+                        <input type="number" name="house_size" value="{{ house_size }}">
+                    </label>
+                    <button type="submit"><i class="fas fa-play"></i> Run Simulation</button>
+                </form>
+            </div>
+
+            <!-- Metrics -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <i class="fas fa-bolt"></i>
+                    <div class="metric-value">{{ energy_per_sqm }}</div>
+                    <div class="metric-label">kWh/m²·year</div>
+                    <div class="{% if energy_per_sqm <=35 %}status-optimal{% else %}status-warning{% endif %}">
+                        {% if energy_per_sqm <=35 %}Under Target{% else %}Over Target{% endif %}
                     </div>
                 </div>
-            </form>
-        </div>
-
-        <!-- Key Metrics -->
-        <div class="metrics-grid">
-            <div class="metric-card">
-                <i class="fas fa-bolt metric-icon"></i>
-                <span class="metric-value">{{ energy_per_sqm or '32.4' }}</span>
-                <div class="metric-label">kWh/m²·year</div>
-                <div class="status-indicator {% if (energy_per_sqm or 32.4) <= 35 %}status-optimal{% else %}status-warning{% endif %}">
-                    <i class="fas fa-{% if (energy_per_sqm or 32.4) <= 35 %}check-circle{% else %}exclamation-triangle{% endif %}"></i>
-                    {% if (energy_per_sqm) <= 300 %}Under Target{% else %}Over Target{% endif %}
+                <div class="metric-card">
+                    <i class="fas fa-solar-panel"></i>
+                    <div class="metric-value">{{ solar_coverage }}%</div>
+                    <div class="metric-label">Solar Efficiency</div>
+                </div>
+                <div class="metric-card">
+                    <i class="fas fa-battery-three-quarters"></i>
+                    <div class="metric-value">{{ battery_utilization }}%</div>
+                    <div class="metric-label">Battery Utilization</div>
+                </div>
+                <div class="metric-card">
+                    <i class="fas fa-dollar-sign"></i>
+                    <div class="metric-value">¥{{ total_cost }}</div>
+                    <div class="metric-label">Estimated Build Cost</div>
+                </div>
+                <div class="metric-card">
+                    <i class="fas fa-tree"></i>
+                    <div class="metric-value">{{ embodied_carbon }} kg CO₂e/m²</div>
+                    <div class="metric-label">Embodied Carbon</div>
+                </div>
+                <div class="metric-card">
+                    <i class="fas fa-water"></i>
+                    <div class="metric-value">{{ water_saving }}%</div>
+                    <div class="metric-label">Water Savings</div>
                 </div>
             </div>
-            <div class="metric-card">
-                <i class="fas fa-solar-panel metric-icon"></i>
-                <span class="metric-value">{{ solar_efficiency or '87' }}%</span>
-                <div class="metric-label">Solar Efficiency</div>
+
+            <!-- Charts -->
+            <div class="charts">
+                <canvas id="monthlyEnergyChart" height="200"></canvas>
+                <canvas id="hourlyEnergyChart" height="200"></canvas>
             </div>
-            <div class="metric-card">
-                <i class="fas fa-battery-three-quarters metric-icon"></i>
-                <span class="metric-value">{{ battery_utilization or '73' }}%</span>
-                <div class="metric-label">Battery Utilization</div>
-            </div>
-            <div class="metric-card">
-                <i class="fas fa-dollar-sign metric-icon"></i>
-                <span class="metric-value">${{ cost_savings or '1,240' }}</span>
-                <div class="metric-label">Annual Savings</div>
+
+            <!-- AI Insight -->
+            <div class="ai-insight">
+                <h3><i class="fas fa-brain"></i> AI Optimization Insight</h3>
+                <p>{{ suggestion }}</p>
             </div>
         </div>
 
-        <div class="charts-grid">
-            <div class="chart-card">
-                <h3 class="chart-title">
-                    <i class="fas fa-thermometer-half"></i>
-                    Temperature Analysis
-                </h3>
-                <div class="chart-content">
-                    <canvas id="temperatureChart"></canvas>
-                </div>
-            </div>
-            <div class="chart-card">
-                <h3 class="chart-title">
-                    <i class="fas fa-chart-bar"></i>
-                    Energy Flow
-                </h3>
-                <div class="chart-content">
-                    <canvas id="energyChart"></canvas>
-                </div>
-            </div>
-        </div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+        <script id="chart-data" type="application/json">{{ chart_data | safe }}</script>
+        <script>
+        let data = JSON.parse(document.getElementById('chart-data').textContent);
 
-        <div class="chart-card">
-            <h3 class="chart-title">
-                <i class="fas fa-battery-half"></i>
-                Battery State of Charge
-            </h3>
-            <div class="chart-content">
-                <canvas id="batteryChart"></canvas>
-            </div>
-        </div>
-
-        <div class="ai-insight">
-            <h3 class="ai-title">
-                <i class="fas fa-brain"></i>
-                AI Optimization Insight
-            </h3>
-            <p class="ai-text">
-                {{ suggestion or "Based on current weather conditions and energy patterns, consider shifting high-energy appliances to peak solar hours (11 AM - 2 PM) to maximize renewable energy utilization and reduce grid dependency by up to 23%." }}
-            </p>
-        </div>
-
-        <footer class="footer">
-            <p>🎓 IB Computer Science Project | Powered by Flask, Chart.js & AI | {{ current_year or '2024' }}</p>
-        </footer>
-    </div>
-
-    <!-- Load Chart.js before our custom JavaScript -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-    
-    <!-- Pass data from Flask to JavaScript -->
-    <script id="chart-data" type="application/json">{{ chart_data | safe }}</script>
-    
-    <script>
-        // Get chart data safely from the JSON script tag
-        let chartData;  
-        try {
-            const dataElement = document.getElementById('chart-data');
-            chartData = JSON.parse(dataElement.textContent);
-        } catch (e) {
-            console.error('Error parsing chart data:', e);
-            // Fallback data if parsing fails
-            chartData = {
-                hours: ['0:00', '1:00', '2:00', '3:00', '4:00', '5:00', '6:00', '7:00', '8:00', '9:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'],
-                temperature: { indoor: Array(24).fill(20), outdoor: Array(24).fill(15) },
-                energy: { load: Array(24).fill(2), pv_output: Array(24).fill(1) },
-                battery: Array(24).fill(5)
-            };
-        }
-
-        // Chart.js styling configuration
-        const chartOptions = {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: {
-                duration: 1000,
-                easing: 'easeInOutQuart'
+        // Monthly Energy Chart
+        new Chart(document.getElementById('monthlyEnergyChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: data.months,
+                datasets: [
+                    {label:'Load (kWh)', data:data.consumption, backgroundColor:'rgba(231,76,60,0.7)'},
+                    {label:'PV Output (kWh)', data:data.pv_output, backgroundColor:'rgba(46,204,113,0.7)'}
+                ]
             },
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: {
-                        usePointStyle: true,
-                        font: { size: 12, weight: '500' },
-                        padding: 20
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    grid: { 
-                        color: 'rgba(0,0,0,0.05)',
-                        drawBorder: false
-                    },
-                    ticks: { 
-                        font: { size: 11 },
-                        color: '#666'
-                    }
-                },
-                y: {
-                    grid: { 
-                        color: 'rgba(0,0,0,0.05)',
-                        drawBorder: false
-                    },
-                    ticks: { 
-                        font: { size: 11 },
-                        color: '#666'
-                    }
-                }
-            }
-        };
-
-        // Wait for DOM to be ready
-        document.addEventListener('DOMContentLoaded', function() {
-            // Temperature Chart
-            const tempCtx = document.getElementById('temperatureChart');
-            if (tempCtx) {
-                new Chart(tempCtx.getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: chartData.hours,
-                        datasets: [
-                            {
-                                label: 'Indoor Temperature',
-                                data: chartData.temperature.indoor,
-                                borderColor: '#667eea',
-                                backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                                borderWidth: 3,
-                                fill: true,
-                                tension: 0.4,
-                                pointBackgroundColor: '#667eea',
-                                pointBorderColor: '#fff',
-                                pointBorderWidth: 2,
-                                pointRadius: 4,
-                                pointHoverRadius: 6
-                            },
-                            {
-                                label: 'Outdoor Temperature',
-                                data: chartData.temperature.outdoor,
-                                borderColor: '#764ba2',
-                                backgroundColor: 'rgba(118, 75, 162, 0.1)',
-                                borderWidth: 3,
-                                fill: true,
-                                tension: 0.4,
-                                pointBackgroundColor: '#764ba2',
-                                pointBorderColor: '#fff',
-                                pointBorderWidth: 2,
-                                pointRadius: 4,
-                                pointHoverRadius: 6
-                            }
-                        ]
-                    },
-                    options: {
-                        ...chartOptions,
-                        scales: {
-                            ...chartOptions.scales,
-                            y: {
-                                ...chartOptions.scales.y,
-                                title: { 
-                                    display: true, 
-                                    text: 'Temperature (°C)',
-                                    font: { weight: 'bold' }
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-
-            // Energy Chart
-            const energyCtx = document.getElementById('energyChart');
-            if (energyCtx) {
-                new Chart(energyCtx.getContext('2d'), {
-                    type: 'bar',
-                    data: {
-                        labels: chartData.hours,
-                        datasets: [
-                            {
-                                label: 'Energy Load',
-                                data: chartData.energy.load,
-                                backgroundColor: 'rgba(231, 76, 60, 0.8)',
-                                borderColor: '#e74c3c',
-                                borderWidth: 2,
-                                borderRadius: 6,
-                                borderSkipped: false
-                            },
-                            {
-                                label: 'Solar Output',
-                                data: chartData.energy.pv_output,
-                                backgroundColor: 'rgba(46, 204, 113, 0.8)',
-                                borderColor: '#2ecc71',
-                                borderWidth: 2,
-                                borderRadius: 6,
-                                borderSkipped: false
-                            }
-                        ]
-                    },
-                    options: {
-                        ...chartOptions,
-                        scales: {
-                            ...chartOptions.scales,
-                            y: {
-                                ...chartOptions.scales.y,
-                                title: { 
-                                    display: true, 
-                                    text: 'Energy (kWh)',
-                                    font: { weight: 'bold' }
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-
-            // Battery Chart
-            const batteryCtx = document.getElementById('batteryChart');
-            if (batteryCtx) {
-                new Chart(batteryCtx.getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: chartData.hours,
-                        datasets: [{
-                            label: 'Battery Charge',
-                            data: chartData.battery,
-                            borderColor: '#f39c12',
-                            backgroundColor: 'rgba(243, 156, 18, 0.2)',
-                            borderWidth: 3,
-                            fill: true,
-                            tension: 0.4,
-                            pointBackgroundColor: '#f39c12',
-                            pointBorderColor: '#fff',
-                            pointBorderWidth: 2,
-                            pointRadius: 4,
-                            pointHoverRadius: 6
-                        }]
-                    },
-                    options: {
-                        ...chartOptions,
-                        scales: {
-                            ...chartOptions.scales,
-                            y: {
-                                ...chartOptions.scales.y,
-                                title: { 
-                                    display: true, 
-                                    text: 'Charge (kWh)',
-                                    font: { weight: 'bold' }
-                                },
-                                min: 0,
-                                max: 10
-                            }
-                        }
-                    }
-                });
-            }
+            options:{responsive:true, plugins:{legend:{position:'top'}}, scales:{y:{beginAtZero:true}}}
         });
 
-        // Form handling
-        document.addEventListener('DOMContentLoaded', function() {
-            const simulationForm = document.getElementById('simulationForm');
-            const simulateBtn = document.getElementById('simulateBtn');
-            
-            if (simulationForm && simulateBtn) {
-                simulationForm.addEventListener('submit', function() {
-                    simulateBtn.innerHTML = '<span class="loading-spinner"></span> Simulating...';
-                    simulateBtn.disabled = true;
-                });
-
-                // Auto-update on input change
-                let timeout;
-                const inputs = document.querySelectorAll('.form-input');
-                inputs.forEach(input => {
-                    input.addEventListener('change', function() {
-                        clearTimeout(timeout);
-                        timeout = setTimeout(() => {
-                            simulationForm.submit();
-                        }, 800);
-                    });
-                });
-            }
+        // Hourly Energy Chart (Representative Days)
+        monthsToShow = ['Jan','Jul'];  // remove 'let' to avoid redeclaration
+        let hourlyDatasets = [];
+        monthsToShow.forEach(m=>{
+            let prof = data.hourly_profiles[m];
+            hourlyDatasets.push({
+                label:`Load ${m}`, data:prof.load, borderColor:m==='Jan'?'#e74c3c':'#f39c12',
+                backgroundColor:m==='Jan'?'rgba(231,76,60,0.2)':'rgba(243,156,18,0.2)', fill:true, tension:0.4
+            });
+            hourlyDatasets.push({
+                label:`PV ${m}`, data:prof.pv_output, borderColor:m==='Jan'?'#2ecc71':'#3498db',
+                backgroundColor:m==='Jan'?'rgba(46,204,113,0.2)':'rgba(52,152,219,0.2)', fill:true, tension:0.4
+            });
         });
-    </script>
-</body>
+        new Chart(document.getElementById('hourlyEnergyChart').getContext('2d'),{
+            type:'line',
+            data:{labels:data.hourly_profiles['Jan'].hours,datasets:hourlyDatasets},
+            options:{responsive:true, plugins:{legend:{position:'top'}}, scales:{y:{beginAtZero:true}}}
+        });
+        </script>
+    </body>
 </html>
