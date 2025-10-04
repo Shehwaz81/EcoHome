@@ -65,7 +65,10 @@ def index():
     # --- Metrics ---
     daily_consumption = np.sum(load_hourly)
     energy_per_sqm = daily_consumption*365/house_size
-    solar_coverage = min((np.sum(pv_hourly)/daily_consumption)*100, 100)  # capped at 100%
+    annual_pv = DAILY_PV_KWH_BASE * 365 * weather_factor.get(weather,1.0) * np.mean(list(MONTH_FACTORS.values())) * 0.85  # include ~15% system losses
+    annual_consumption = HOUSE_CONSUMPTION_KWH_DAY * 365
+
+    solar_coverage = round(min((annual_pv / annual_consumption) * 100, 100), 1)
     battery_utilization = (np.sum(battery_soc > MIN_SOC)/24)*100
     total_cost = int(COST_PER_M * house_size)
 
