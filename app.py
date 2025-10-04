@@ -6,21 +6,44 @@ app = Flask(__name__)
 
 # --- Constants ---
 HOUSE_SIZE_DEFAULT = 120  # m²
-PV_PANELS = 13
-PV_PANEL_W = 330  # W
-PV_SYSTEM_KW = PV_PANELS * PV_PANEL_W / 1000  # 4.29 kW system
-DAILY_PV_KWH_BASE = 17.16  # average daily PV energy (adjusted by weather/season)
-HOUSE_CONSUMPTION_KWH_DAY = 11  # max daily to meet IB constraints
+CONSUMPTION_PER_M2_DAY = 0.09  # kWh/m²/day
 BATTERY_CAPACITY_KWH = 10
 COST_PER_M = 43784
 EMBODIED_CARBON = 180  # kg CO₂e/m²
 WATER_SAVING = 30  # %
+MAX_BUDGET = 2_000_000  # ¥
+DAILY_PV_KWH_BASE = 17.16  # Base PV output for scaling
 
 # Seasonal solar factor (Shirakawa)
 MONTH_FACTORS = {
-    'Jan':0.6, 'Feb':0.7, 'Mar':0.8, 'Apr':0.9, 'May':1.0,
-    'Jun':1.0, 'Jul':1.0, 'Aug':0.95, 'Sep':0.85, 'Oct':0.75, 'Nov':0.65, 'Dec':0.6
+    'Jan':0.7, 'Feb':0.72, 'Mar':0.82, 'Apr':0.88, 'May':1.0,
+    'Jun':0.83, 'Jul':0.78, 'Aug':0.77, 'Sep':0.70, 'Oct':0.70, 'Nov':0.70, 'Dec':0.69
 }
+
+# Hourly peak profile (centered)
+PEAK_PROFILE = np.array([
+    0.2,0.3,0.5,0.6,0.8,1,1,0.9,0.7,0.6,0.5,0.4,
+    0.4,0.5,0.6,0.8,1,1,0.8,0.6,0.4,0.3,0.2,0.2
+])
+PEAK_PROFILE -= np.mean(PEAK_PROFILE)
+
+# --- Helper Functions ---
+def scale_peak(load_base):
+    scale = 1.0
+    while np.sum(load_base + PEAK_PROFILE*scale) > np.sum(load_base):
+        scale *= 0.95
+    return scale
+
+def battery_sim(pv_hourly, load_hourly, capacity=BATTERY_CAPACITY_KWH, efficiency=0.9):
+    soc = 0
+    MIN_SOC = 1
+    battery_soc = np.zeros(24)
+    for i in range(24):
+        net = pv_hourly[i] - load_hourly[i]
+        soc += net*efficiency if net > 0 else net/efficiency
+        soc = np.clip(soc, MIN_SOC, capacity)
+        battery_soc[i] = soc
+    return battery_soc
 
 @app.route("/")
 def index():
@@ -28,51 +51,37 @@ def index():
     month = request.args.get("month", "Jan")
     house_size = float(request.args.get("house_size", HOUSE_SIZE_DEFAULT))
 
-    # Adjust PV for weather & month
+    # --- House daily consumption ---
+    house_daily_consumption = CONSUMPTION_PER_M2_DAY * house_size
+
+    # --- PV scaling relative to consumption ---
+    # PV aims to cover ~75% of daily consumption, capped by base PV system
+    target_coverage = 0.75
     weather_factor = {"sunny":1.0, "cloudy":0.7, "rainy":0.4}
-    pv_daily = DAILY_PV_KWH_BASE * weather_factor.get(weather,1.0) * MONTH_FACTORS.get(month,1.0)
+    pv_daily = min(DAILY_PV_KWH_BASE, house_daily_consumption * target_coverage)
+    pv_daily *= weather_factor.get(weather,1.0) * MONTH_FACTORS.get(month,1.0)
 
-    # hourly load prof
+    # --- Load Profile ---
+    base_load = np.full(24, house_daily_consumption / 24)
+    peak_scale = scale_peak(base_load)
+    load_hourly = base_load + PEAK_PROFILE * peak_scale
+
+    # --- PV Hourly Profile ---
     hours = np.arange(24)
-    base_load = np.full(24, HOUSE_CONSUMPTION_KWH_DAY/24)
-    peak_profile = np.array([0.2,0.3,0.5,0.6,0.8,1,1,0.9,0.7,0.6,0.5,0.4,
-                             0.4,0.5,0.6,0.8,1,1,0.8,0.6,0.4,0.3,0.2,0.2])
-    peak_profile = peak_profile - np.mean(peak_profile)  # center around 0
-    # Scale peak_profile to fit daily energy limit
-    peak_scale = 1.0
-    while np.sum(base_load + peak_profile*peak_scale) > HOUSE_CONSUMPTION_KWH_DAY:
-        peak_scale *= 0.95
-    load_hourly = base_load + peak_profile*peak_scale
-
-    # --- PV hourly profile ---
     pv_hourly = pv_daily * np.sin((hours - 6) * np.pi / 12)
     pv_hourly = np.clip(pv_hourly, 0, None)
 
-    # --- Battery simulation ---
-    EFFICIENCY = 0.9
-    MIN_SOC = 1  # kWh
-    soc = 0
-    battery_soc = np.zeros(24)
-    for i in range(24):
-        net = pv_hourly[i] - load_hourly[i]
-        if net > 0:
-            soc += net * EFFICIENCY
-        else:
-            soc += net / EFFICIENCY
-        soc = min(max(soc, MIN_SOC), BATTERY_CAPACITY_KWH)
-        battery_soc[i] = soc
+    # --- Battery Simulation ---
+    battery_soc = battery_sim(pv_hourly, load_hourly)
+    battery_utilization = (np.sum(battery_soc > 1) / 24) * 100
 
     # --- Metrics ---
-    daily_consumption = np.sum(load_hourly)
-    energy_per_sqm = daily_consumption*365/house_size
-    annual_pv = DAILY_PV_KWH_BASE * 365 * weather_factor.get(weather,1.0) * np.mean(list(MONTH_FACTORS.values())) * 0.85  # include ~15% system losses
-    annual_consumption = HOUSE_CONSUMPTION_KWH_DAY * 365
-
+    annual_pv = pv_daily * 365 * 0.85  # include ~15% system losses
+    annual_consumption = house_daily_consumption * 365
     solar_coverage = round(min((annual_pv / annual_consumption) * 100, 100), 1)
-    battery_utilization = (np.sum(battery_soc > MIN_SOC)/24)*100
     total_cost = int(COST_PER_M * house_size)
 
-    # --- Dynamic AI suggestions ---
+    # --- Dynamic AI Suggestion ---
     if battery_utilization < 50:
         suggestion = "Battery underused. Store excess PV or shift appliance usage to daytime."
     elif battery_utilization > 90:
@@ -80,10 +89,10 @@ def index():
     else:
         suggestion = "Shift high-energy appliances to peak solar hours (11-14h)."
 
-    # --- Chart data ---
+    # --- Chart Data ---
     chart_data = {
         'months': list(MONTH_FACTORS.keys()),
-        'consumption':[HOUSE_CONSUMPTION_KWH_DAY*30]*12,
+        'consumption':[house_daily_consumption*30]*12,
         'pv_output':[pv_daily*30]*12,
         'hourly_profiles':{
             'Jan': {'hours':[f"{h}:00" for h in hours], 'load':load_hourly.tolist(), 'pv_output':pv_hourly.tolist()},
@@ -98,8 +107,8 @@ def index():
         weather=weather,
         month=month,
         house_size=int(house_size),
-        energy_per_sqm=round(energy_per_sqm,1),
-        solar_coverage=round(solar_coverage,1),
+        energy_per_sqm=round(annual_consumption/house_size,1),
+        solar_coverage=solar_coverage,
         battery_utilization=round(battery_utilization),
         total_cost=total_cost,
         embodied_carbon=EMBODIED_CARBON,
